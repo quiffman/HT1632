@@ -1,0 +1,28 @@
+*.swp
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+
+# CMake
+CMakeCache.txt
+CMakeFiles
+Makefile
+cmake_install.cmake
+install_manifest.txt
+
+# Ignore the binaries.
+examples/basicdemo/basicdemo
+examples/clear/clear
+examples/matrixdemo/matrixdemo
+examples/matrixshapes/matrixshapes

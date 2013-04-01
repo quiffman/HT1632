@@ -2,17 +2,17 @@
 
 #define DATA 2
 #define WR   3
-#define CS   4
-#define CS2  5
+#define CS   0
+#define CS2  1
 
 // use this line for single matrix
-HT1632LEDMatrix matrix = HT1632LEDMatrix(DATA, WR, CS);
+//HT1632LEDMatrix matrix = HT1632LEDMatrix(DATA, WR, CS);
 // use this line for two matrices!
-//HT1632LEDMatrix matrix = HT1632LEDMatrix(DATA, WR, CS, CS2);
+HT1632LEDMatrix matrix = HT1632LEDMatrix(DATA, WR, CS, CS2);
 
 void setup() {
-  Serial.begin(9600);
-  matrix.begin(HT1632_COMMON_16NMOS);  
+  matrix.begin(HT1632_COMMON_16NMOS);
+  matrix.setBrightness(1);
   matrix.fillScreen();
   delay(500);
 
@@ -80,3 +80,4 @@ void loop() {
 
   // whew!
 }
+/* vim: set ts=2 sw=2 tw=0 et :*/

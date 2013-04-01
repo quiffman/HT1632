@@ -1,8 +1,19 @@
-#if(ARDUINO >= 100)
- #include <Arduino.h>
-#else
- #include <WProgram.h>
-#endif
+//#include <Arduino.h>
+#include <wiringPi.h>
+#include <wiringPiSPI.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+#include <errno.h>
+#include <string.h>
+
+#include <unistd.h>
+
+#include "bit_array.h"
+
+#include "Print.h"
 
 #define HT1632_READ  0x6
 #define HT1632_WRITE 0x5
@@ -24,6 +35,8 @@
 #define HT1632_COMMON_16NMOS  0x24
 #define HT1632_COMMON_8PMOS  0x28
 #define HT1632_COMMON_16PMOS  0x2C
+
+typedef uint8_t boolean;
 
 class HT1632 {
 
@@ -50,6 +63,7 @@ class HT1632 {
   void sendcommand(uint8_t c);
   void writedata(uint16_t d, uint8_t bits);
   void writeRAM(uint8_t addr, uint8_t data);
+  void *reverse_endian(void *p, size_t size);
 };
 
 class HT1632LEDMatrix : public Print {
@@ -84,11 +98,7 @@ class HT1632LEDMatrix : public Print {
   void setCursor(uint8_t x, uint8_t y);
   void setTextSize(uint8_t s);
   void setTextColor(uint8_t c);
-#if(ARDUINO >= 100)
   size_t write(uint8_t c);
-#else
-  void write(uint8_t c);
-#endif
   void drawChar(uint8_t x, uint8_t y, char c, uint16_t color, uint8_t size);
 
   void drawBitmap(uint8_t x, uint8_t y, 

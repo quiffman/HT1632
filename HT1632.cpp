@@ -4,6 +4,8 @@
 
 #define swap(a, b) { uint16_t t = a; a = b; b = t; }
 
+#define _BV(bit) (1 << (bit))
+
 HT1632LEDMatrix::HT1632LEDMatrix(uint8_t data, uint8_t wr, uint8_t cs1) {
   matrices = (HT1632 *)malloc(sizeof(HT1632));
 
@@ -102,6 +104,13 @@ uint8_t HT1632LEDMatrix::height() {
 }
 
 void HT1632LEDMatrix::begin(uint8_t type) {
+  if (wiringPiSPISetup(0, 2560000) < 0) {
+    printf ( "SPI Setup Failed: %s\n", strerror(errno));
+  }
+  if (wiringPiSetup() == -1) {
+    exit(1);
+  }
+
   for (uint8_t i=0; i<matrixNum; i++) {
     matrices[i].begin(type);
   }
@@ -277,11 +286,7 @@ void HT1632LEDMatrix::setTextColor(uint8_t c) {
   textcolor = c;
 }
 
-#if ARDUINO >= 100
 size_t HT1632LEDMatrix::write(uint8_t c) {
-#else
-void HT1632LEDMatrix::write(uint8_t c) {
-#endif
   if (c == '\n') {
     cursor_y += textsize*8;
     cursor_x = 0;
@@ -291,9 +296,7 @@ void HT1632LEDMatrix::write(uint8_t c) {
     drawChar(cursor_x, cursor_y, c, textcolor, textsize);
     cursor_x += textsize*6;
   }
-#if ARDUINO >= 100
   return 1;
-#endif
 }
 
 
@@ -301,7 +304,7 @@ void HT1632LEDMatrix::write(uint8_t c) {
 void HT1632LEDMatrix::drawChar(uint8_t x, uint8_t y, char c, 
 			      uint16_t color, uint8_t size) {
   for (uint8_t i =0; i<5; i++ ) {
-    uint8_t line = pgm_read_byte(font+(c*5)+i);
+    uint8_t line = font[(c*5)+i];
     for (uint8_t j = 0; j<8; j++) {
       if (line & 0x1) {
 	if (size == 1) // default size
@@ -321,7 +324,7 @@ void HT1632LEDMatrix::drawBitmap(uint8_t x, uint8_t y,
 			uint8_t color) {
   for (uint8_t j=0; j<h; j++) {
     for (uint8_t i=0; i<w; i++ ) {
-      if (pgm_read_byte(bitmap + i + (j/8)*w) & _BV(j%8)) {
+      if (bitmap[i + (j/8)*w] & _BV(j%8)) {
 	drawPixel(x+i, y+j, color);
       }
     }
@@ -345,9 +348,6 @@ HT1632::HT1632(int8_t data, int8_t wr, int8_t cs, int8_t rd) {
 void HT1632::begin(uint8_t type) {
   pinMode(_cs, OUTPUT);
   digitalWrite(_cs, HIGH);
-  pinMode(_wr, OUTPUT);
-  digitalWrite(_wr, HIGH);
-  pinMode(_data, OUTPUT);
   
   if (_rd >= 0) {
     pinMode(_rd, OUTPUT);
@@ -387,65 +387,52 @@ void HT1632::clrPixel(uint16_t i) {
 }
 
 void HT1632::dumpScreen() {
-  Serial.println("---------------------------------------");
+  printf("---------------------------------------\n");
 
   for (uint16_t i=0; i<(WIDTH*HEIGHT/8); i++) {
-    Serial.print("0x");
-    Serial.print(ledmatrix[i], HEX);
-    Serial.print(" ");
-    if (i % 3 == 2) Serial.println();
+    printf("0x%x ", ledmatrix[i]);
+    if (i % 3 == 2) printf("\n");
   }
 
-  Serial.println("\n---------------------------------------");
+  printf("\n---------------------------------------\n");
 }
 
 void HT1632::writeScreen() {
 
+  // Prepare
+  int size = WIDTH * HEIGHT / 8;
+  uint8_t *output = (uint8_t *) malloc(size+2);
+
+  // Write Operation
+  *output = 0b10100000;
+  *(output+1) = 0;
+
+  // copy from ledmatrix, with 0 offset bits, for WIDTH*HEIGHT bits,
+  // to output (+ 1 byte), with 2 offset bits.
+  bitarray_copy(ledmatrix, 0, WIDTH*HEIGHT, (output+1), 2);
+
+  // copy the first nibble in at the end to account for the circular write.
+  bitarray_copy(ledmatrix, 0, 4, (output+1), WIDTH*HEIGHT+2);
+  
+  // Start
   digitalWrite(_cs, LOW);
 
-  writedata(HT1632_WRITE, 3);
-  // send with address 0
-  writedata(0, 7);
+  wiringPiSPIDataRW(0,output,size+2);
 
-  for (uint16_t i=0; i<(WIDTH*HEIGHT/8); i+=2) {
-    uint16_t d = ledmatrix[i];
-    d <<= 8;
-    d |= ledmatrix[i+1];
-
-    writedata(d, 16);
-  }
+  // Finish
   digitalWrite(_cs, HIGH);
 }
 
 
 void HT1632::clearScreen() {
-  for (uint8_t i=0; i<(WIDTH*HEIGHT/8); i++) {
-    ledmatrix[i] = 0;
-  }
+  memset(ledmatrix,0,WIDTH*HEIGHT/8);
   writeScreen();
 }
 
 
-void HT1632::writedata(uint16_t d, uint8_t bits) {
-  pinMode(_data, OUTPUT);
-  for (uint8_t i=bits; i > 0; i--) {
-    digitalWrite(_wr, LOW);
-   if (d & _BV(i-1)) {
-     digitalWrite(_data, HIGH);
-   } else {
-     digitalWrite(_data, LOW);
-   }
-  digitalWrite(_wr, HIGH);
-  }
-  pinMode(_data, INPUT);
-}
-
-
-
-
 void HT1632::writeRAM(uint8_t addr, uint8_t data) {
-  //Serial.print("Writing 0x"); Serial.print(data&0xF, HEX);
-  //Serial.print(" to 0x"); Serial.println(addr & 0x7F, HEX);
+  //printf("Writing 0x%x", data&0xF);
+  //printf(" to 0x%x\n", addr & 0x7F);
 
   uint16_t d = HT1632_WRITE;
   d <<= 7;
@@ -454,7 +441,8 @@ void HT1632::writeRAM(uint8_t addr, uint8_t data) {
   d |= data & 0xF;
  
   digitalWrite(_cs, LOW);
-  writedata(d, 14);
+  reverse_endian(&d, sizeof(d));
+  wiringPiSPIDataRW(0, (uint8_t *) &d, 2);
   digitalWrite(_cs, HIGH);
 }
 
@@ -464,10 +452,15 @@ void HT1632::sendcommand(uint8_t cmd) {
   data = HT1632_COMMAND;
   data <<= 8;
   data |= cmd;
-  data <<= 1;
-  
+  data <<= 5;
+
+  // Write Operation  
   digitalWrite(_cs, LOW);
-  writedata(data, 12);
+
+  reverse_endian(&data, sizeof(data));
+  wiringPiSPIDataRW(0, (uint8_t *) &data, 2);
+
+  // Finish
   digitalWrite(_cs, HIGH);  
 }
 
@@ -478,3 +471,17 @@ void HT1632::fillScreen() {
   }
   writeScreen();
 }
+
+void *HT1632::reverse_endian(void *p, size_t size) {
+  char *head = (char *)p;
+  char *tail = head + size -1;
+
+  for(; tail > head; --tail, ++head) {
+    char temp = *head;
+    *head = *tail;
+    *tail = temp;
+  }
+  return p;
+}
+
+/* vim: set ts=2 sw=2 tw=0 et:*/

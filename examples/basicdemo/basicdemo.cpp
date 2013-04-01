@@ -7,16 +7,24 @@ and using only 3 pins - data, write and select.
 Multiple HT1632's can share data and write pins, but need unique CS pins.
 */
 
-#define DATA 2
-#define WR 3
-#define CS 4
+#define DATA 0
+#define WR 0
+#define CS 0
 
 HT1632 matrix = HT1632(DATA, WR, CS);
 
 void setup() {
-  Serial.begin(9600);
+  if (wiringPiSPISetup(0, 2560000) < 0) {
+    printf ( "SPI Setup Failed: %s\n", strerror(errno));
+  }
+  if (wiringPiSetup() == -1) {
+    exit(1);
+  }
+
   matrix.begin(HT1632_COMMON_16NMOS);
-  
+
+  matrix.setBrightness(1);
+
   delay(100);
   matrix.clearScreen();
 
@@ -54,3 +62,4 @@ void testMatrix(HT1632 matrix) {
 void loop() {
   testMatrix(matrix);
 }
+/* vim: set ts=2 sw=2 tw=0 et :*/
