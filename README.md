@@ -10,8 +10,10 @@ I used WiringPi GPIO 0-3, numbered according to [the WiringPi Pins page](https:/
 
 Build
 ---
+```console
 pi@raspbmc $ sudo apt-get install cmake make gcc g++
 pi@raspbmc $ cmake . && make
+```
 
 Thanks
 ---
